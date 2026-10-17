@@ -4,7 +4,7 @@
 
 This project builds a machine-learning system that recommends a support team for incoming Kestrel Home Appliances service requests.
 
-The selected model is trained to predict the team that ultimately resolved each request (`final_team`), rather than simply reproducing the initial queue assignment. This aligns the prediction target more closely with the intended business outcome.
+The selected model predicts the team that ultimately resolved each request (`final_team`) rather than simply reproducing the initial queue assignment. This target is intended to better reflect the business outcome, but it is distinct from the historical-label acceptance criterion.
 
 The solution includes batch prediction, a FastAPI prediction service, a Streamlit interface, a confidence-based human-review policy, and automated tests.
 
@@ -13,24 +13,24 @@ The solution includes batch prediction, a FastAPI prediction service, a Streamli
 - **Selected model:** TF-IDF text features with logistic regression.
 - **Training records:** 10,822.
 - **Chronological validation records:** 2,168.
-- **Outcome accuracy:** 83.86%.
-- **Outcome macro-F1:** 84.06%.
-- **Existing-bot outcome accuracy:** 76.61% on the same validation set.
+- **Final-outcome accuracy:** 83.86%.
+- **Final-outcome macro-F1:** 84.06%.
+- **Existing-bot final-outcome accuracy:** 76.61% on the same validation set.
 - **Improvement over the existing bot:** 7.24 percentage points.
-- **Outcome majority-class baseline accuracy:** 23.25%.
+- **Final-outcome majority-class baseline:** 23.25%.
 
-The chronological split uses earlier records for training and later records for validation. This is more representative of a time-ordered deployment scenario than a random split, although performance may change as request patterns and operations evolve.
+The chronological split uses earlier records for training and later records for validation. This better represents a time-ordered deployment scenario than a random split, although performance may change as request patterns and operations evolve.
 
-A separate historical-label model achieved **94.37% accuracy**. This measures agreement with historical team assignments, not accuracy against final resolution teams. It is not the accuracy of the selected outcome model.
+A separate model achieved **94.37% accuracy against historical team labels**. This measures agreement with historical queue assignments; it is not the accuracy of the selected final-outcome model.
 
-The selected outcome model has not demonstrated 90% overall accuracy against final resolution teams. The 90% historical-label acceptance criterion must be evaluated separately from final-outcome performance.
+The selected model has not demonstrated 90% overall accuracy against final resolution teams. The historical-label acceptance criterion must be evaluated separately.
 
 ## Confidence-Based Human Review
 
-The current provisional policy uses:
+The provisional review policy uses:
 
-- A minimum prediction confidence of **0.60**.
-- A minimum top-two prediction-score margin of **0.10**.
+- Minimum prediction confidence: **0.60**.
+- Minimum top-two prediction-score margin: **0.10**.
 
 On the chronological validation set:
 
@@ -39,7 +39,7 @@ On the chronological validation set:
 - **Accuracy among automatically routed requests:** 95.80%.
 - **Referred for human review:** 404 requests, or 18.63%.
 
-These results are retrospective validation results, not guarantees of production performance. The thresholds were evaluated on the same validation set used to assess the policy, so performance may be optimistic. Model confidence has not been formally calibrated.
+These are retrospective validation results, not guarantees of production performance. The thresholds were evaluated on the same validation set used to assess the policy, so results may be optimistic. Model confidence has not been formally calibrated.
 
 Requests flagged for review should be checked by an appropriate support employee before routing.
 
@@ -63,10 +63,10 @@ Historical team names are normalized to current team names.
 - `src/` — data loading, training, evaluation, error analysis, and batch prediction.
 - `ui/` — Streamlit interface.
 - `tests/` — automated tests.
-- `data/` — local assessment datasets; do not publish.
+- `data/` — local assessment datasets; excluded from Git.
 - `models/` — trained model artifact; excluded from Git by default.
 - `reports/` — evaluation and operational analysis; excluded from Git by default.
-- `predictions.csv` — batch predictions for the unlabelled assessment records; handle as restricted operational data.
+- `predictions.csv` — batch predictions for unlabelled assessment records. Handle as restricted operational data.
 - `memo.md` — business decision memo.
 
 ## Requirements and Setup
@@ -90,17 +90,27 @@ If the virtual environment already exists, activate it without recreating it.
 python -m pip install -r requirements.txt
 ```
 
-## Run the Pipeline
+### 3. Prepare the assessment data
 
-### Train and evaluate candidate models
+Obtain the assessment data through the approved channel. Place the required input files in the local `data/` directory using the filenames expected by the source code.
+
+Do not commit or publish restricted source data.
+
+### 4. Train the model
+
+Run the training pipeline to generate the model artifact and evaluation outputs locally:
 
 ```powershell
 python -m src.train
 ```
 
-This compares candidate models using a chronological validation split, selects the best outcome-based candidate by accuracy and then macro-F1, retrains the selected model on all available labelled records, and saves the model and evaluation reports locally.
+Confirm that training completes successfully and creates the model artifact expected by the API configuration.
+
+## Run the Pipeline
 
 ### Generate assessment predictions
+
+After training the model, run:
 
 ```powershell
 python -m src.predict_batch
@@ -108,7 +118,7 @@ python -m src.predict_batch
 
 This generates `predictions.csv` in the project root with the required `request_id` and `team` columns. The pipeline validates the output schema, record count, request ID uniqueness, and predicted team names.
 
-Treat this file as restricted operational data unless an approved submission channel explicitly permits sharing it.
+Treat this file as restricted operational data unless an authorized submission channel explicitly permits sharing it.
 
 ### Run automated tests
 
@@ -120,7 +130,7 @@ The test suite checks data preparation, team-name normalization, model loading, 
 
 ## Run the API
 
-From the project root:
+After generating the model artifact, run:
 
 ```powershell
 python -m uvicorn app.main:app --reload
@@ -157,7 +167,7 @@ This is evidence of improved historical outcome prediction, not proof that the m
 
 The available dataset covers approximately 14.9 months rather than the 18 months described in the business request. Performance on legacy Zoho records has not been independently validated.
 
-The model should run in shadow mode before any live routing change. Compare its recommendations with actual resolutions, transfers, additional customer contacts, manual overrides, and resolution times. Report the 90% historical-label criterion separately from final-outcome accuracy.
+The recommended next step is a controlled shadow-mode pilot. Compare model recommendations with actual resolutions, transfers, additional customer contacts, manual overrides, and resolution times. Report the 90% historical-label criterion separately from final-outcome accuracy.
 
 ## Cost Considerations
 
@@ -175,10 +185,12 @@ Customer and operational data must be handled according to the applicable busine
 
 Do not publish source datasets, request-level validation outputs, restricted model outputs, credentials, or other protected information in a public repository without authorization.
 
-The local `.gitignore` excludes data CSVs, reports, trained model artifacts, and local diagnostic files. Review Git status and repository history before publishing. Confirm an approved submission method for `predictions.csv`, which contains request IDs.
+The local `.gitignore` excludes data CSVs, reports, trained model artifacts, and local diagnostic files. Review Git status and repository history before publishing.
+
+The assessment requests a public repository containing `predictions.csv`, while the supplied operations policy prohibits public sharing of customer and operational data. Obtain written clarification or an approved submission method before publishing that file or other restricted artifacts.
 
 ## Deployment Recommendation
 
 Proceed with a controlled shadow-mode pilot with human review. Evaluate data governance, performance by team and channel, ambiguous requests, legacy-source performance, and measurable operational outcomes before considering live routing.
 
-The current evidence does not justify immediately switching off the existing bot.
+**The current evidence does not justify immediately switching off the existing bot.**
