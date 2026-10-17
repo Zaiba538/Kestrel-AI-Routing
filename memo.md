@@ -9,9 +9,9 @@ Proceed with a **controlled shadow-mode pilot with human review**. Do not switch
 
 The selected text-based logistic regression model achieved **83.86% accuracy** and **84.06% macro-F1** against final resolution teams on a chronological validation set of 2,168 requests. On the same validation set, the existing bot achieved 76.61% outcome accuracy, giving the model a **7.24-percentage-point improvement**.
 
-A separate historical-label model achieved **94.37% accuracy**. This exceeds 90% for that historical-label evaluation, but it does not establish 90% accuracy against final resolution teams. The selected outcome-based model has not demonstrated the requested 90% historical-label agreement criterion either.
+A separate historical-label model achieved **94.37% accuracy** against historical queue assignments. This result does not establish 90% accuracy against final resolution teams. The selected outcome-based model has not demonstrated the requested 90% historical-label agreement criterion either; that criterion must be evaluated separately against the specified target.
 
-The acceptance metric should be confirmed with the business, and the two targets must be reported separately.
+The business should confirm which target determines acceptance, and both metrics should be reported separately.
 
 ## Routing Policy and Human Review
 
